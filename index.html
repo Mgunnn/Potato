@@ -392,7 +392,7 @@ function updateState(newState, target = null) {
             if (selectedPhoto) resetPhoto(selectedPhoto);
             gsap.to(photoGroup.rotation, { x: 0, y: 0, z: 0, duration: 2 }); 
             AudioController.play(120, 1.5, 'sine');
-            showFeedback("重歸塵埃");
+            showFeedback("登出🥔世界");
             gsap.to("#status-dot", { background: "#8b7355", scale: 1, duration: 0.5 });
             break;
 
@@ -628,7 +628,7 @@ function checkIsFist(l) {
 function checkIsPalm(l) {
     const palm = l[0];
     const fingers = [8, 12, 16, 20];
-    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.35);
+    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.3);
 }
 
 function showFeedback(text) {
