@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Universe of a Potato - Orbital Layers</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.7.1/gsap.min.js"></script>
@@ -16,6 +16,10 @@
             background: #050302; 
             font-family: 'Inter', system-ui, -apple-system, sans-serif; 
             color: #d2b48c; 
+            /* 防止移動端橡皮筋效果 */
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
         
         #ui-layer {
@@ -25,6 +29,11 @@
             display: flex; flex-direction: column; justify-content: space-between;
             padding: 40px; box-sizing: border-box;
             z-index: 10;
+        }
+
+        /* 手機端縮小間距 */
+        @media (max-width: 768px) {
+            #ui-layer { padding: 20px; }
         }
 
         .header h1 { 
@@ -38,6 +47,10 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             opacity: 0.9; 
+        }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.2rem; letter-spacing: 0.2em; }
         }
         
         .status-indicator { 
@@ -104,7 +117,17 @@
             transform: scaleX(-1);
             background: #000;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: auto; /* 手機端可能需要觸發啟動音樂 */
         }
+
+        /* 手機端縮小視頻預覽 */
+        @media (max-width: 768px) {
+            #video-preview {
+                width: 100px; height: 75px;
+                bottom: 20px; right: 20px;
+            }
+        }
+
         #input_video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
         #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
@@ -116,6 +139,11 @@
             text-shadow: 0 0 30px rgba(210, 180, 140, 0.5);
             text-align: center;
             z-index: 5;
+            width: 90%;
+        }
+
+        @media (max-width: 480px) {
+            #feedback-hint { font-size: 1.5rem; }
         }
 
         #loading {
@@ -125,6 +153,15 @@
         }
         .loader-ring { width: 60px; height: 60px; border: 2px solid rgba(139, 115, 85, 0.2); border-top-color: #d2b48c; border-radius: 50%; animation: spin 1.5s infinite cubic-bezier(0.5, 0, 0.5, 1); }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        #hint-text {
+            text-align: center; font-weight: 300; opacity: 0.5; font-size: 0.8rem; 
+            letter-spacing: 0.1em; line-height: 2;
+        }
+
+        @media (max-width: 480px) {
+            #hint-text { font-size: 0.65rem; line-height: 1.6; }
+        }
     </style>
 </head>
 <body>
@@ -142,7 +179,7 @@
             <span id="status-text">就緒</span>
         </div>
     </div>
-    <div id="hint-text" style="text-align: center; font-weight: 300; opacity: 0.5; font-size: 0.8rem; letter-spacing: 0.1em; line-height: 2;">
+    <div id="hint-text">
         🖐️ 張開手掌: 喚醒記憶 | 🤏 捏合手指: 鎖定碎片<br>
         🌌 空白處捏合: 旋轉軌道 | 👋 放開手指: 深度回望 | ✊ 握緊拳頭: 回歸塵埃
     </div>
@@ -199,7 +236,7 @@ const CONFIG = {
     PHOTO_BASE_WIDTH: 200, 
     LAYER_RADII: [450, 700, 950], 
     ORBIT_SPEEDS: [0.0012, 0.0008, 0.0005],
-    FOCUS_Z: 550 // 相機前方 Z 軸目標位置 (世界坐標)
+    FOCUS_Z: 550 
 };
 
 const STATES = {
@@ -249,7 +286,8 @@ function init() {
     scene.fog = new THREE.FogExp2(0x050302, 0.0004);
 
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 6000);
-    camera.position.z = 1000; 
+    // 初始調整相機 Z 軸以適配移動端比例
+    camera.position.z = window.innerWidth < window.innerHeight ? 1400 : 1000; 
 
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -430,7 +468,7 @@ function updateState(newState, target = null) {
 
         case STATES.FOCUSED:
             if (selectedPhoto) {
-                // --- 1. 自適應大圖比例計算 ---
+                // --- 1. 自適應大圖比例計算 (針對手機屏優化) ---
                 const distToCam = camera.position.z - CONFIG.FOCUS_Z;
                 const vFOV = THREE.MathUtils.degToRad(camera.fov);
                 const visibleHeight = 2 * Math.tan(vFOV / 2) * distToCam;
@@ -438,8 +476,11 @@ function updateState(newState, target = null) {
                 
                 const imgAspect = selectedPhoto.userData.aspect; // height / width
                 
-                // 根據要求：橫向 0.5，豎向更小 0.35
-                const zoomFactor = (imgAspect < 1) ? 0.5 : 0.3;
+                // 適配手機豎屏：如果是豎屏且圖片也是長型，適當調整比例
+                let zoomFactor = (imgAspect < 1) ? 0.5 : 0.35;
+                if (camera.aspect < 1) { // 手機豎屏模式
+                    zoomFactor = (imgAspect < 1) ? 0.7 : 0.45;
+                }
                 
                 let finalScaleX, finalScaleY;
                 if (imgAspect > camera.aspect) {
@@ -451,17 +492,14 @@ function updateState(newState, target = null) {
                 }
 
                 // --- 2. 展示方向與位置校準 ---
-                // 目標：在世界坐標系下正對相機。由於它是 photoGroup 的子對象，我們需要考慮父容器的旋轉。
                 const targetWorldPos = new THREE.Vector3(0, 0, CONFIG.FOCUS_Z);
                 const localPos = selectedPhoto.parent.worldToLocal(targetWorldPos.clone());
                 
-                // 動畫：移動到目標位置
                 gsap.to(selectedPhoto.position, { 
                     x: localPos.x, y: localPos.y, z: localPos.z, 
                     duration: 1.2, ease: "expo.out" 
                 });
                 
-                // 動畫：反向旋轉以抵消 photoGroup 的旋轉，使其正對相機
                 gsap.to(selectedPhoto.rotation, { 
                     x: -photoGroup.rotation.x, 
                     y: -photoGroup.rotation.y, 
@@ -470,7 +508,6 @@ function updateState(newState, target = null) {
                     ease: "expo.out"
                 });
 
-                // 動画：縮放
                 gsap.to(selectedPhoto.scale, { 
                     x: finalScaleX, y: finalScaleY, 
                     duration: 1.2, ease: "expo.out" 
@@ -638,10 +675,22 @@ function showFeedback(text) {
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    camera.aspect = w / h;
+    
+    // 適配手機豎屏：如果寬度小於高度，增加相機距離，確保內容不超出左右邊緣
+    if (w < h) {
+        camera.position.z = 1400; 
+    } else {
+        camera.position.z = 1000;
+    }
+    
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(w, h);
+    
     if (currentState === STATES.FOCUSED && selectedPhoto) {
+        // 重新觸發 FOCUSED 狀態以調整當前聚焦照片的比例
         updateState(STATES.FOCUSED, selectedPhoto);
     }
 }
@@ -663,17 +712,11 @@ function animate() {
         if (!isDraggingView && currentState === STATES.EXPLODED) photoGroup.rotation.y += 0.0004;
         
         photoGroup.children.forEach((p, i) => {
-            // --- 深度回望狀態下的手部跟隨微調 (Tilting) ---
             if (currentState === STATES.FOCUSED && p === selectedPhoto) {
-                // 基礎旋转：抵消父容器，使其正對相機
                 const baseRX = -photoGroup.rotation.x;
                 const baseRY = -photoGroup.rotation.y;
-                
-                // 偏移量：根據 mouse 位置產生 3D 傾斜感 (Tilting)
                 const tiltX = baseRX + (mouse.y * 0.25);
                 const tiltY = baseRY + (mouse.x * 0.25);
-                
-                // 平滑插值
                 p.rotation.x += (tiltX - p.rotation.x) * 0.1;
                 p.rotation.y += (tiltY - p.rotation.y) * 0.1;
                 return; 
