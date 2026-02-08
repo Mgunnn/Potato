@@ -628,7 +628,7 @@ function checkIsFist(l) {
 function checkIsPalm(l) {
     const palm = l[0];
     const fingers = [8, 12, 16, 20];
-    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.42);
+    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.35);
 }
 
 function showFeedback(text) {
