@@ -439,7 +439,7 @@ function updateState(newState, target = null) {
                 const imgAspect = selectedPhoto.userData.aspect; // height / width
                 
                 // 根據要求：橫向 0.5，豎向更小 0.35
-                const zoomFactor = (imgAspect < 1) ? 0.5 : 0.25;
+                const zoomFactor = (imgAspect < 1) ? 0.5 : 0.3;
                 
                 let finalScaleX, finalScaleY;
                 if (imgAspect > camera.aspect) {
@@ -628,7 +628,7 @@ function checkIsFist(l) {
 function checkIsPalm(l) {
     const palm = l[0];
     const fingers = [8, 12, 16, 20];
-    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.3);
+    return fingers.every(i => Math.hypot(l[i].x - palm.x, l[i].y - palm.y) > 0.42);
 }
 
 function showFeedback(text) {
